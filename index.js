@@ -435,7 +435,19 @@ app.get('/events/:id', async(req,res) => {
 
 
 
+app.get('/upcoming-events', async (req, res) => {
+  const today = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Asia/Dhaka",
+  }).format(new Date());
 
+  const result = await events
+    .find({ eventDate: { $gte: today } })
+    .sort({ eventDate: 1 })
+    .limit(6)
+    .toArray();
+
+  res.send(result);
+});
 
 
 
