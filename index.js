@@ -140,10 +140,11 @@ app.post("/events", async (req, res) => {
 
 
 app.get('/events', async (req, res) => {
-  const result = await events.find({}).toArray();
+  const { createdBy } = req.query;
+  const query = createdBy ? { createdBy: createdBy.toLowerCase() } : {};
+  const result = await events.find(query).toArray();
   res.send(result);
 });
-
 
 // ADDED: join-status check so the details page can show "Already Joined"
 // after a reload. GET /events/:id/join?userId=... -> { joined: boolean }
@@ -218,6 +219,191 @@ app.post('/events/:id/join', async (req, res) => {
     });
   } catch (error) {
     console.error("Join event error:", error);
+    res.status(500).send({ message: "Internal server error!" });
+  }
+});
+
+
+
+
+
+
+// UPDATE EVENT
+app.patch("/events/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const {
+      title,
+      description,
+      eventType,
+      image,
+      location,
+      eventDate,
+      createdBy,
+    } = req.body;
+
+    // Validate MongoDB ID
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({
+        success: false,
+        message: "Invalid event ID",
+      });
+    }
+
+    // Validate required fields
+    if (
+      !title ||
+      !description ||
+      !eventType ||
+      !image ||
+      !location ||
+      !eventDate ||
+      !createdBy
+    ) {
+      return res.status(400).send({
+        success: false,
+        message: "All fields are required",
+      });
+    }
+
+    // Find existing event
+    const existingEvent = await events.findOne({
+      _id: new ObjectId(id),
+    });
+
+    if (!existingEvent) {
+      return res.status(404).send({
+        success: false,
+        message: "Event not found",
+      });
+    }
+
+    // Check event ownership
+    if (
+      existingEvent.createdBy?.toLowerCase() !==
+      createdBy.toLowerCase()
+    ) {
+      return res.status(403).send({
+        success: false,
+        message: "You are not allowed to update this event",
+      });
+    }
+
+    // Validate event date
+    const today = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Dhaka",
+    }).format(new Date());
+
+    if (eventDate <= today) {
+      return res.status(400).send({
+        success: false,
+        message: "Event date must be in the future",
+      });
+    }
+
+    // Validate image URL
+    try {
+      const imageUrl = new URL(image);
+
+      if (!["http:", "https:"].includes(imageUrl.protocol)) {
+        throw new Error("Invalid image URL");
+      }
+    } catch {
+      return res.status(400).send({
+        success: false,
+        message: "Please provide a valid image URL",
+      });
+    }
+
+    // Update event
+    const updatedEvent = {
+      title: title.trim(),
+      description: description.trim(),
+      eventType,
+      image,
+      location: location.trim(),
+      eventDate,
+      updatedAt: new Date(),
+    };
+
+    await events.updateOne(
+      { _id: new ObjectId(id) },
+      { $set: updatedEvent }
+    );
+
+    const result = await events.findOne({
+      _id: new ObjectId(id),
+    });
+
+    res.send({
+      success: true,
+      message: "Event updated successfully",
+      event: result,
+    });
+  } catch (error) {
+    console.error("Update event error:", error);
+
+    res.status(500).send({
+      success: false,
+      message: "Failed to update event",
+    });
+  }
+});
+
+
+
+app.delete("/events/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { createdBy } = req.query;
+
+    if (!ObjectId.isValid(id)) {
+      return res.status(400).send({ message: "Invalid event id!" });
+    }
+
+    const event = await events.findOne({ _id: new ObjectId(id) });
+    if (!event) {
+      return res.status(404).send({ message: "Event not found!" });
+    }
+
+    if (event.createdBy?.toLowerCase() !== createdBy?.toLowerCase()) {
+      return res.status(403).send({ message: "You can only delete your own events!" });
+    }
+
+    await events.deleteOne({ _id: new ObjectId(id) });
+    await joins.deleteMany({ eventId: id });
+
+    res.send({ success: true, message: "Event deleted successfully!" });
+  } catch (error) {
+    console.error("Delete event error:", error);
+    res.status(500).send({ message: "Internal server error!" });
+  }
+});
+
+
+app.get("/joined-events", async (req, res) => {
+  try {
+    const { userId } = req.query;
+
+    if (!userId) {
+      return res.status(400).send({ message: "userId is required!" });
+    }
+
+    const userJoins = await joins.find({ userId }).toArray();
+
+    const eventIds = userJoins
+      .map((join) => join.eventId)
+      .filter((id) => ObjectId.isValid(id))
+      .map((id) => new ObjectId(id));
+
+    const result = await events
+      .find({ _id: { $in: eventIds } })
+      .sort({ eventDate: 1 })
+      .toArray();
+
+    res.send(result);
+  } catch (error) {
+    console.error("Joined events error:", error);
     res.status(500).send({ message: "Internal server error!" });
   }
 });
