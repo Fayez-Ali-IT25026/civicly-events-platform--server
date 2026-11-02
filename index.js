@@ -575,27 +575,27 @@ app.get("/joined-events", verifyToken, async (req, res) => {
 // UPCOMING EVENTS
 // ------------------------------------
 
-// app.get("/upcoming-events", async (req, res) => {
-//   try {
-//     const today = getToday();
+app.get("/upcoming-events", async (req, res) => {
+  try {
+    const today = getToday();
 
-//     const result = await events
-//       .find({
-//         eventDate: { $gte: today },
-//       })
-//       .sort({ eventDate: 1 })
-//       .limit(6)
-//       .toArray();
+    const result = await events
+      .find({
+        eventDate: { $gte: today },
+      })
+      .sort({ eventDate: 1 })
+      .limit(6)
+      .toArray();
 
-//     res.send(result);
-//   } catch (error) {
-//     console.error("Upcoming events error:", error);
+    res.send(result);
+  } catch (error) {
+    console.error("Upcoming events error:", error);
 
-//     res.status(500).send({
-//       message: "Failed to load upcoming events!",
-//     });
-//   }
-// });
+    res.status(500).send({
+      message: "Failed to load upcoming events!",
+    });
+  }
+});
 
 // ------------------------------------
 // START SERVER
