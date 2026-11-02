@@ -14,12 +14,28 @@ const PORT = process.env.PORT || 8000;
 // Middleware
 // ------------------------------------
 
+// app.use(
+//   cors({
+//     origin: process.env.CLIENT_URL || "http://localhost:3000",
+//     credentials: true,
+//   })
+// );
+
+const allowedOrigins = [
+  "https://civicly-events-platform.vercel.app",
+  "http://localhost:3000",
+];
+
 app.use(
   cors({
-    origin: process.env.CLIENT_URL || "http://localhost:3000",
+    origin: allowedOrigins,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
   })
 );
+
+app.use(express.json());
 
 app.use(express.json());
 
